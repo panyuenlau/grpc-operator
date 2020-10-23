@@ -1,0 +1,24 @@
+# permissions for end users to edit grpcs.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: grpc-editor-role
+rules:
+- apiGroups:
+  - grpc.darrenlau.com
+  resources:
+  - grpcs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - grpc.darrenlau.com
+  resources:
+  - grpcs/status
+  verbs:
+  - get

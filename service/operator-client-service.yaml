@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: operator-client
+  labels:
+    app: operator-client
+spec:
+  type: NodePort
+  ports: # define container target port and the port for the service
+  - port: 8081
+    protocol: TCP
+    targetPort: client-port
+    nodePort: 30000
+  selector:
+    app: grpc-client # select Pod template label(s) that service will apply to
+    # Service will apply to resources with a label of app: grpc-client-pod

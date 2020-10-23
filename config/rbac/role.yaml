@@ -1,0 +1,47 @@
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  creationTimestamp: null
+  name: manager-role
+rules:
+- apiGroups:
+  - grpc.example.com
+  resources:
+  - deployments
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - grpc.example.com
+  resources:
+  - grpcclients
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - grpc.example.com
+  resources:
+  - grpcclients/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - grpc.example.com
+  resources:
+  - pods
+  verbs:
+  - get
+  - lists

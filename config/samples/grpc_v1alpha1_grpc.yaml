@@ -1,0 +1,10 @@
+apiVersion: grpc.darrenlau.com/v1alpha1
+kind: Grpc
+metadata:
+  name: grpc-client
+  labels:
+    app: grpc-client
+spec:
+  size: 2
+  image: darrenlau1227/grpc-client-restapi
+  protocol: TCP

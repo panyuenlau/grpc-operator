@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: grpc-service # this is how other resources refer to this service
+  labels:
+    app: grpc-service
+spec:
+  type: ClusterIP # default is ClusterIP service
+  ports: # define container target port and the port for the service
+  - port: 50051
+    protocol: TCP
+    targetPort: server-port
+  selector: # select Pod template labels that service will apply to
+    app: grpc-server-pod # Service will apply to resources with a label of run:grpc-server

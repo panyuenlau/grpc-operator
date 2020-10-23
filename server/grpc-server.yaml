@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grpc-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels: # this tells the current resource (Deployment, Service...) to match the pod with the same label
+      app: grpc-server-pod
+  template: # this config applies to the Pods -> podTemplate
+    metadata:
+      labels: # this is the label for the pod, not the deployment itself
+        app: grpc-server-pod
+    spec: # blueprint for a Pod
+      containers:
+      - name: grpc-server-container
+        image: darrenlau1227/grpc-server
+        imagePullPolicy: Always
+        ports:
+        - name: server-port
+          containerPort: 50051
+          protocol: TCP
+      restartPolicy: Always
