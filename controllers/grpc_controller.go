@@ -30,6 +30,7 @@ import (
 	"reflect"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"strconv"
 	"time"
 
 	grpcv1alpha1 "github.com/panyuenlau/grpc-operator/api/v1alpha1"
@@ -42,10 +43,14 @@ type GrpcReconciler struct {
 	Scheme *runtime.Scheme
 }
 
-var (
+const (
+	nodePortNum                 int32 = 30010
+	grpcClientPort                    = 8081
 	grpcClientContainerPortName       = "grpc-client"
-	clusterIPPort               int32 = 30010
-	performServerCheck          bool  = true
+)
+
+var (
+	performServerCheck = true
 )
 
 // +kubebuilder:rbac:groups=grpc.example.com,resources=grpcclients,verbs=get;list;watch;create;update;patch;delete
@@ -179,25 +184,32 @@ func (r GrpcReconciler) checkServerStatus(grpcClient *grpcv1alpha1.Grpc) {
 
 	for {
 		//resp, errHTTP := http.Get("http://localhost:" + strconv.Itoa(int(nodePort)) + "/serverstatus")
-		//resp, errHTTP := http.Get("http://localhost:8082/serverstatus")
 
-		resp, errHTTP := http.Get("http://grpc-client:30010/serverstatus")
+		grpcClientAddr := "http://localhost:" + strconv.Itoa(int(nodePortNum)) + "/serverstatus"
 
-		//resp, errHTTP := http.Get("http://localhost/10.109.244.147:30010/serverstatus")
+		resp, errHTTP := http.Get(grpcClientAddr)
 
+		// If the server is currently down
 		if errHTTP != nil || resp.StatusCode != 200 {
 			log.Info("The gRPC server is down!")
-			grpcClient.Status.ServerStatus = "not running"
-			if err := r.Status().Update(ctx, grpcClient); err != nil {
-				log.Error(err, "Failed to update GrpcClient status")
+			// Only perform the update if current status is different from previous
+			if grpcClient.Status.ServerStatus == "running" {
+				grpcClient.Status.ServerStatus = "not running"
+				if err := r.Status().Update(ctx, grpcClient); err != nil {
+					log.Error(err, "Failed to update GrpcClient status")
+				}
 			}
+
 			time.Sleep(time.Duration(retryStatusFreq) * time.Second)
 			continue
 		}
 
-		grpcClient.Status.ServerStatus = "running"
-		if err := r.Status().Update(ctx, grpcClient); err != nil {
-			log.Error(err, "Failed to update GrpcClient status")
+		// If the server is up and running properly
+		if grpcClient.Status.ServerStatus != "running" {
+			grpcClient.Status.ServerStatus = "running"
+			if err := r.Status().Update(ctx, grpcClient); err != nil {
+				log.Error(err, "Failed to update GrpcClient status")
+			}
 		}
 
 		defer resp.Body.Close()
@@ -272,6 +284,7 @@ func (r *GrpcReconciler) deploymentForGrpcClient(grpcClient *grpcv1alpha1.Grpc) 
 	return deployment
 }
 
+// Create the service for operator to reach to grpc-client pods
 func (r *GrpcReconciler) serviceForGrpcClient(grpcClient *grpcv1alpha1.Grpc) *corev1.Service {
 	ls := labelsForGrpcClient(grpcClient.Name)
 	log := r.Log.WithValues("operator-client-service", grpcClient.Namespace)
@@ -282,15 +295,15 @@ func (r *GrpcReconciler) serviceForGrpcClient(grpcClient *grpcv1alpha1.Grpc) *co
 			Namespace: grpcClient.Namespace,
 		},
 		Spec: corev1.ServiceSpec{
-			Type:     corev1.ServiceTypeClusterIP,
+			Type:     corev1.ServiceTypeNodePort,
 			Selector: ls,
 			Ports: []corev1.ServicePort{
 				{
-					Port:     clusterIPPort,
+					NodePort: nodePortNum,
+					Port:     8081,
 					Protocol: corev1.ProtocolTCP,
 					TargetPort: intstr.IntOrString{
-						//StrVal: grpcClientContainerPortName,
-						IntVal: 8081,
+						StrVal: grpcClientContainerPortName,
 					},
 				},
 			},
