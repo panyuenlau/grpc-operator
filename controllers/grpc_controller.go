@@ -205,6 +205,7 @@ func (r GrpcReconciler) checkServerStatus(grpcClient *grpcv1alpha1.Grpc) {
 		}
 
 		// If the server is up and running properly
+		log.Info("The gRPC server is up and running!")
 		if grpcClient.Status.ServerStatus != "running" {
 			grpcClient.Status.ServerStatus = "running"
 			if err := r.Status().Update(ctx, grpcClient); err != nil {
