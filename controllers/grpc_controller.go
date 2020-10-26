@@ -107,6 +107,7 @@ func (r *GrpcReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	err = r.Get(ctx, types.NamespacedName{Name: grpcClient.Name, Namespace: grpcClient.Namespace}, foundService)
 	if err != nil && errors.IsNotFound(err) {
 		svc := r.serviceForGrpcClient(grpcClient)
+
 		log.Info("Creating a new Service", "Service.Namespace", svc.Namespace,
 			"Service.Name", svc.Name)
 		err = r.Create(ctx, svc)
@@ -168,16 +169,19 @@ func (r *GrpcReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	// When the program enters the reconcile in the first time, creat a goroutine to keep track of server status
 	if performServerCheck {
 		performServerCheck = false
-		go r.checkServerStatus(grpcClient)
+		log.Info("Checking server status")
+		go r.checkServerStatus(grpcClient, ctx, foundService)
 	}
 
 	// Reconcile successful -> don't requeue
 	return ctrl.Result{}, nil
 }
 
-func (r GrpcReconciler) checkServerStatus(grpcClient *grpcv1alpha1.Grpc) {
+func (r GrpcReconciler) checkServerStatus(grpcClient *grpcv1alpha1.Grpc, ctx context.Context, service *corev1.Service) {
 	log := ctrl.Log.WithName("controllers").WithName("serverStatus")
-	ctx := context.Background()
+	//ctx := context.Background()
+	//err := r.Get(ctx, types.NamespacedName{Name: grpcClient.Name, Namespace: grpcClient.Namespace}, service)
+	//log.Error(err, "Failed to do get() before update()", grpcClient.Name, grpcClient.Namespace, service.Name, service.Spec.Ports)
 
 	checkStatusFreq := 5
 	retryStatusFreq := 10
@@ -193,8 +197,9 @@ func (r GrpcReconciler) checkServerStatus(grpcClient *grpcv1alpha1.Grpc) {
 		if errHTTP != nil || resp.StatusCode != 200 {
 			log.Info("The gRPC server is down!")
 			// Only perform the update if current status is different from previous
-			if grpcClient.Status.ServerStatus == "running" {
-				grpcClient.Status.ServerStatus = "not running"
+			if grpcClient.Status.ServerStatus != "down" {
+				grpcClient.Status.ServerStatus = "down"
+
 				if err := r.Status().Update(ctx, grpcClient); err != nil {
 					log.Error(err, "Failed to update GrpcClient status")
 				}
@@ -238,7 +243,7 @@ func (r *GrpcReconciler) deploymentForGrpcClient(grpcClient *grpcv1alpha1.Grpc) 
 	containerImage := grpcClient.Spec.Image
 	containerProtocol := grpcClient.Spec.Protocol
 	containerName := "grpc-client"
-	var containerPort int32 = 8081 // the port that the container is listening to?
+	var containerPort int32 = 8081 // the port that the container is listening to
 
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -301,7 +306,7 @@ func (r *GrpcReconciler) serviceForGrpcClient(grpcClient *grpcv1alpha1.Grpc) *co
 			Ports: []corev1.ServicePort{
 				{
 					NodePort: nodePortNum,
-					Port:     8081,
+					Port:     grpcClientPort,
 					Protocol: corev1.ProtocolTCP,
 					TargetPort: intstr.IntOrString{
 						StrVal: grpcClientContainerPortName,
