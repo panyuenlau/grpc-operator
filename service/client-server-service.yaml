@@ -11,4 +11,4 @@ spec:
     protocol: TCP
     targetPort: server-port
   selector: # select Pod template labels that service will apply to
-    app: grpc-server-pod # Service will apply to resources with a label of run:grpc-server
+    app: grpc-server-pod # Service will apply to resources with a label of app:grpc-server

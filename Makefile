@@ -132,3 +132,6 @@ cleanup:
 	kubectl delete -f server
 	kubectl delete -f service/client-server-service.yaml
 	kubectl delete -f config/samples/grpc_v1alpha1_grpc.yaml
+
+getCRD:
+	kubectl describe grpcs.grpc.darrenlau.com grpc-client

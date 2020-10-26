@@ -110,9 +110,8 @@ func (r *GrpcReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 
 		log.Info("Creating a new Service", "Service.Namespace", svc.Namespace,
 			"Service.Name", svc.Name)
-		err = r.Create(ctx, svc)
 
-		if err != nil {
+		if err = r.Create(ctx, svc); err != nil {
 			log.Error(err, "Failed to create new Service", "Service.Namespace",
 				svc.Namespace, "Service.Name", svc.Name)
 			return ctrl.Result{}, err
@@ -155,9 +154,9 @@ func (r *GrpcReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	}
 	podNames := getPodNames(podList.Items)
 
-	// Update status.Nodes if needed
-	if !reflect.DeepEqual(podNames, grpcClient.Status.Nodes) {
-		grpcClient.Status.Nodes = podNames
+	// Update status.PodNames if needed
+	if !reflect.DeepEqual(podNames, grpcClient.Status.PodNames) {
+		grpcClient.Status.PodNames = podNames
 		err := r.Status().Update(ctx, grpcClient)
 		if err != nil {
 			log.Error(err, "Failed to update GrpcClient status")
@@ -179,15 +178,18 @@ func (r *GrpcReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 
 func (r GrpcReconciler) checkServerStatus(grpcClient *grpcv1alpha1.Grpc, ctx context.Context, service *corev1.Service) {
 	log := ctrl.Log.WithName("controllers").WithName("serverStatus")
-	//ctx := context.Background()
-	//err := r.Get(ctx, types.NamespacedName{Name: grpcClient.Name, Namespace: grpcClient.Namespace}, service)
-	//log.Error(err, "Failed to do get() before update()", grpcClient.Name, grpcClient.Namespace, service.Name, service.Spec.Ports)
 
 	checkStatusFreq := 5
-	retryStatusFreq := 10
+	retryCheckFreq := 10
 
 	for {
 		//resp, errHTTP := http.Get("http://localhost:" + strconv.Itoa(int(nodePort)) + "/serverstatus")
+
+		//err := r.Get(ctx, types.NamespacedName{Name: grpcClient.Name, Namespace: grpcClient.Namespace}, service)
+		err := r.Get(ctx, types.NamespacedName{Name: grpcClient.Name, Namespace: grpcClient.Namespace}, grpcClient)
+		if err != nil {
+			log.Error(err, service.Name)
+		}
 
 		grpcClientAddr := "http://localhost:" + strconv.Itoa(int(nodePortNum)) + "/serverstatus"
 
@@ -205,7 +207,7 @@ func (r GrpcReconciler) checkServerStatus(grpcClient *grpcv1alpha1.Grpc, ctx con
 				}
 			}
 
-			time.Sleep(time.Duration(retryStatusFreq) * time.Second)
+			time.Sleep(time.Duration(retryCheckFreq) * time.Second)
 			continue
 		}
 
@@ -243,7 +245,6 @@ func (r *GrpcReconciler) deploymentForGrpcClient(grpcClient *grpcv1alpha1.Grpc) 
 	containerImage := grpcClient.Spec.Image
 	containerProtocol := grpcClient.Spec.Protocol
 	containerName := "grpc-client"
-	var containerPort int32 = 8081 // the port that the container is listening to
 
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -268,11 +269,15 @@ func (r *GrpcReconciler) deploymentForGrpcClient(grpcClient *grpcv1alpha1.Grpc) 
 						Name:  containerName,
 						// ContainerPort represents a network port in a single container
 						Ports: []corev1.ContainerPort{{
-							ContainerPort: containerPort,
+							ContainerPort: grpcClientPort,
 							// Each named port in a pod must have a unique name. Name for the port that can be
 							// referred to by services.
 							Name:     grpcClientContainerPortName,
 							Protocol: containerProtocol,
+						}},
+						Env: []corev1.EnvVar{{
+							Name:  "SERVICE_TO_GRPC_SERVER",
+							Value: "grpc-service:50051",
 						}},
 					}},
 				},
@@ -321,7 +326,6 @@ func (r *GrpcReconciler) serviceForGrpcClient(grpcClient *grpcv1alpha1.Grpc) *co
 		log.Error(err, "Failed to set controller reference for the grpc client service:", err)
 		return nil
 	}
-
 	return svc
 }
 

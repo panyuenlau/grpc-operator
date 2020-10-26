@@ -45,10 +45,10 @@ type GrpcStatus struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
 	// Nodes are the names of the grpc client pods
-	Nodes []string `json:"nodes"`
+	PodNames []string `json:"podNames"`
 
 	// ServerStatus is the current status of the grpc server
-	ServerStatus string `json:"serverstatus"`
+	ServerStatus string `json:"serverStatus"`
 }
 
 // +kubebuilder:object:root=true
